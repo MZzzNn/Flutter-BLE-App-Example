@@ -3,14 +3,20 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:test_bluetooth_app/screens/main/main_screen.dart';
 
-void main() => runApp(MyApp());
+import 'home/home_screen.dart';
+
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Flutter BLE Example',
+      debugShowCheckedModeBanner: false,
       home: MyHomePage(),
     );
   }
@@ -46,12 +52,12 @@ class _MyHomePageState extends State<MyHomePage> {
           context: context,
           builder: (BuildContext context) {
             return AlertDialog(
-              title: Text("Error"),
-              content: Text("Bluetooth is not turned on"),
+              title: const Text("Error"),
+              content: const Text("Bluetooth is not turned on"),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: Text("OK"),
+                  child: const Text("OK"),
                 ),
               ],
             );
@@ -63,6 +69,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    _disbose();
+    super.dispose();
+  }
+  _disbose() {
     scanSubscription?.cancel();
     characteristicSubscription?.cancel();
     super.dispose();
@@ -146,21 +156,48 @@ class _MyHomePageState extends State<MyHomePage> {
 
   bool get isConnected => status == "Connected";
 
+  _turnOnBluetooth() async {
+
+    await flutterBlue.turnOn();
+    scanForDevices();
+  }
+  _turnOffBluetooth() async{
+    await flutterBlue.turnOff();
+    await device?.disconnect();
+    _disbose();
+    setState(() {status = "Not connected";});
+  }
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Flutter BLE Example"),
+        backgroundColor: Colors.white,
+        title: const Text("Flutter BLE Example", style: TextStyle(color: Colors.black)),
+        actions: [
+          // toggle button to connect/disconnect
+          StreamBuilder<BluetoothState>(
+            stream: FlutterBluePlus.instance.state,
+            initialData: BluetoothState.unknown,
+            builder: (c, snapshot) {
+              if (snapshot.data != BluetoothState.on) {
+                return IconButton(
+                    icon: const Icon(Icons.bluetooth_disabled, color: Colors.red),
+                    onPressed: () async => await _turnOnBluetooth()
+                );
+              } else {
+                return IconButton(
+                    icon: const Icon(Icons.bluetooth,color: Colors.green),
+                    onPressed: () async => await _turnOffBluetooth()
+                );
+              }
+            },
+          ),
+        ],
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text("Status: $status"),
-            Text("Number: $number"),
-          ],
-        ),
-      ),
+      body: _statusWidget(status, number),
       floatingActionButton: Column(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -185,4 +222,42 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
-//flutter_ble_app_example
+
+Widget _statusWidget(String status, int number) {
+  if (status == "Not connected") {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.bluetooth_disabled, size: 100, color: Colors.red),
+          const SizedBox(height: 8),
+          Text("Status: $status"),
+        ],
+      ),
+    );
+  } else if (status == "Connecting..." || status == "Discovering services...") {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 8),
+          Text("Status: $status"),
+        ],
+      ),
+    );
+  } else {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.bluetooth_connected, size: 100, color: Colors.green),
+          const SizedBox(height: 8),
+          Text("Status: $status"),
+          const SizedBox(height: 8),
+          Text("Send Number: $number"),
+        ],
+      ),
+    );
+  }
+}
